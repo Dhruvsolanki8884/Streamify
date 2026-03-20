@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Chat security - prevent screenshot/copy */
+.chat-secure-container,
+.chat-secure-container * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-drag: none !important;
+}
+
+/* Chat background theme - apply to message list when parent has background */
+.chat-secure-container.has-custom-bg .str-chat,
+.chat-secure-container.has-custom-bg .str-chat__main-panel,
+.chat-secure-container.has-custom-bg .str-chat__list,
+.chat-secure-container.has-custom-bg .str-chat__paginated-list {
+  background: transparent !important;
+}
