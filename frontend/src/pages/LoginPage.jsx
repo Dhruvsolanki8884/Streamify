@@ -1,4 +1,5 @@
-import { Link, ShipWheelIcon } from "lucide-react";
+import { ShipWheelIcon } from "lucide-react";
+import { Link } from "react-router";
 import { useState } from "react";
 import useLogin from "../hooks/useLogin";
 
@@ -92,7 +93,7 @@ const LoginPage = () => {
                     {isPending ? (
                       <>
                         <span className="loading loading-spinner loading-xs"></span>
-                        Signing up...
+                        Signing in...
                       </>
                     ) : (
                       "Sign In"

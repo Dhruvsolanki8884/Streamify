@@ -12,15 +12,27 @@ import { connectDB } from "./lib/db.js";
 import { ensureReadEventsEnabled } from "./lib/stream.js";
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5001;
 
 const __dirname = path.resolve();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL, // set this to your Vercel URL in Render env vars
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    credentials: true, // allow frontend to send cookies
-  }),
+    origin: (origin, callback) => {
+      // allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
+    credentials: true,
+  })
 );
 
 app.use(express.json());
@@ -40,6 +52,6 @@ if (process.env.NODE_ENV === "production") {
 
 app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
-  connectDB();
+  await connectDB();
   await ensureReadEventsEnabled();
 });
