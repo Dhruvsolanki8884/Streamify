@@ -16,10 +16,10 @@ export const logout = async () => {
 
 export const getAuthUser = async () => {
   try {
-    const response = await axiosInstance.get("/auth/me");
+    const response = await axiosInstance.get("/auth/me", { timeout: 8000 });
     return response.data;
   } catch (error) {
-    console.log("Error in authentication", error);
+    // Timeout or network error — treat as unauthenticated, don't block UI
     return null;
   }
 };

@@ -16,6 +16,9 @@ import useAuthUser from "./hooks/useAuthUser.js";
 import Layout from "./components/Layout.jsx";
 import { useThemeStore } from "./Store/useThemeStore.js";
 
+// Routes that should render immediately without waiting for auth check
+const PUBLIC_PATHS = ["/signup", "/login"];
+
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
   const { theme } = useThemeStore();
@@ -23,7 +26,11 @@ const App = () => {
   const isAuthenticated = Boolean(authUser);
   const isOnboarded = authUser?.isOnboarded;
 
-  if (isLoading) return <PageLoader />;
+  // Only block on loading for protected routes — public pages show instantly
+  const currentPath = window.location.pathname;
+  const isPublicPath = PUBLIC_PATHS.some((p) => currentPath.startsWith(p));
+
+  if (isLoading && !isPublicPath) return <PageLoader />;
 
   return (
     <div className="h-screen" data-theme={theme}>
@@ -31,7 +38,9 @@ const App = () => {
         <Route
           path="/"
           element={
-            isAuthenticated && isOnboarded ? (
+            isLoading ? (
+              <PageLoader />
+            ) : isAuthenticated && isOnboarded ? (
               <Layout showSidebar={true}>
                 <HomePage />
               </Layout>
@@ -43,7 +52,9 @@ const App = () => {
         <Route
           path="/friends"
           element={
-            isAuthenticated && isOnboarded ? (
+            isLoading ? (
+              <PageLoader />
+            ) : isAuthenticated && isOnboarded ? (
               <Layout showSidebar={true}>
                 <HomePage />
               </Layout>
@@ -55,27 +66,29 @@ const App = () => {
         <Route
           path="/signup"
           element={
-            !isAuthenticated ? (
-              <SignUpPage />
-            ) : (
+            !isLoading && isAuthenticated ? (
               <Navigate to={isOnboarded ? "/" : "/onboarding"} />
+            ) : (
+              <SignUpPage />
             )
           }
         />
         <Route
           path="/login"
           element={
-            !isAuthenticated ? (
-              <LoginPage />
-            ) : (
+            !isLoading && isAuthenticated ? (
               <Navigate to={isOnboarded ? "/" : "/onboarding"} />
+            ) : (
+              <LoginPage />
             )
           }
         />
         <Route
           path="/notifications"
           element={
-            isAuthenticated && isOnboarded ? (
+            isLoading ? (
+              <PageLoader />
+            ) : isAuthenticated && isOnboarded ? (
               <Layout showSidebar={true}>
                 <NotificationsPage />
               </Layout>
@@ -87,31 +100,33 @@ const App = () => {
         <Route
           path="/call/:id"
           element={
-            isAuthenticated && isOnboarded ? (
+            isLoading ? (
+              <PageLoader />
+            ) : isAuthenticated && isOnboarded ? (
               <CallPage />
             ) : (
               <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
             )
           }
         />
-
         <Route
           path="/chat/:id"
           element={
-            isAuthenticated && isOnboarded ? (
-              <Layout showSidebar={false}>
-                <ChatPage />
-              </Layout>
+            isLoading ? (
+              <PageLoader />
+            ) : isAuthenticated && isOnboarded ? (
+              <ChatPage />
             ) : (
               <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
             )
           }
         />
-
         <Route
           path="/profile"
           element={
-            isAuthenticated && isOnboarded ? (
+            isLoading ? (
+              <PageLoader />
+            ) : isAuthenticated && isOnboarded ? (
               <Layout showSidebar={true}>
                 <ProfilePage />
               </Layout>
@@ -120,11 +135,12 @@ const App = () => {
             )
           }
         />
-
         <Route
           path="/onboarding"
           element={
-            isAuthenticated ? (
+            isLoading ? (
+              <PageLoader />
+            ) : isAuthenticated ? (
               !isOnboarded ? (
                 <OnboardingPage />
               ) : (

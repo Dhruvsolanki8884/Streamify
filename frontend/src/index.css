@@ -2,19 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Chat security - prevent screenshot/copy */
-.chat-secure-container,
-.chat-secure-container * {
-  -webkit-user-select: none !important;
-  user-select: none !important;
-  -webkit-touch-callout: none !important;
-  -webkit-user-drag: none !important;
+/* ── Base mobile fixes ── */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
 }
 
-/* Chat background theme - apply to message list when parent has background */
-.chat-secure-container.has-custom-bg .str-chat,
-.chat-secure-container.has-custom-bg .str-chat__main-panel,
-.chat-secure-container.has-custom-bg .str-chat__list,
-.chat-secure-container.has-custom-bg .str-chat__paginated-list {
+#root {
+  height: 100%;
+}
+
+/* ── Stream Chat: hide default header (we use our own) ── */
+.str-chat__channel-header {
+  display: none !important;
+}
+
+/* ── Hide default Stream input — we use CustomMessageInput ── */
+.str-chat__input-flat,
+.str-chat__message-input {
+  display: none !important;
+}
+
+/* ── Stream Chat Window: fill container as flex column ── */
+.str-chat,
+.str-chat__container {
+  height: 100% !important;
   background: transparent !important;
+}
+
+.str-chat__main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  background: transparent !important;
+}
+
+.str-chat__main-panel-inner {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+/* ── Message list: scrollable, anchored to bottom ── */
+.str-chat__list,
+.str-chat__message-list {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 8px 0 4px 0 !important;
+  background: transparent !important;
+}
+
+/* Remove Stream default message padding/margins */
+.str-chat__li,
+.str-chat__message-simple {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Hide Stream default reaction selector */
+.str-chat__message-reactions-button,
+.str-chat__reaction-selector {
+  display: none !important;
+}
+
+/* Hide Stream default action buttons */
+.str-chat__message-actions-box {
+  display: none !important;
+}
+
+/* Prevent iOS zoom on input focus (font-size >= 16px) */
+textarea, input[type="text"] {
+  font-size: 16px !important;
+}
+
+/* ── Stream Video: full screen ── */
+.str-video,
+.str-video__call,
+.str-video__speaker-layout {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* ── Safe area for notch/home bar ── */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* ── Typing bounce animation ── */
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ── Pulse rings for voice call ── */
+@keyframes ping-slow {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* ── Scrollbar hide on mobile ── */
+.str-chat__list::-webkit-scrollbar,
+.str-chat__message-list::-webkit-scrollbar {
+  display: none;
 }
