@@ -4,7 +4,7 @@ import Avatar from "./Avatar";
 
 const FriendCard = ({ friend }) => {
   return (
-    <div className="card bg-base-200/80 hover:bg-base-200 border border-base-300/50 hover:border-primary/20 hover:shadow-lg transition-all duration-300 rounded-2xl">
+    <div className="card bg-base-100 hover:bg-base-200 border border-base-300 hover:border-primary/20 hover:shadow-lg transition-all duration-300 rounded-2xl">
       <div className="card-body p-4 sm:p-5">
         {/* USER INFO */}
         <div className="flex items-center gap-3 mb-3">

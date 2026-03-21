@@ -168,7 +168,7 @@ const HomePage = () => {
                 return (
                   <div
                     key={user._id}
-                    className="group card bg-base-200/80 hover:bg-base-200 border border-base-300/50 hover:border-primary/30 shadow-sm hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden"
+                    className="group card bg-base-100 hover:bg-base-200 border border-base-300 hover:border-primary/30 shadow-sm hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden"
                   >
                     <div className="card-body p-4 sm:p-5 space-y-4">
                       <div className="flex items-start gap-3 sm:gap-4">
