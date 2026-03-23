@@ -2,85 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Base mobile fixes ── */
+/* ══ Base ══ */
 html, body {
   overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
   height: 100%;
+  /* iOS fill */
+  min-height: -webkit-fill-available;
+}
+#root { height: 100%; }
+
+/* ══ CRITICAL: 100dvh respects mobile keyboard ══
+   When soft keyboard opens, dvh shrinks → layout reflows
+   Header stays at top, input stays above keyboard, messages scroll
+*/
+.chat-page-root {
+  height: 100dvh;
+  height: -webkit-fill-available;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-#root {
-  height: 100%;
-}
-
-/* ── Stream Chat: hide default header (we use our own) ── */
-.str-chat__channel-header {
-  display: none !important;
-}
-
-/* ── Hide default Stream input — we use CustomMessageInput ── */
+/* ══ Stream Chat — nuke all default chrome ══ */
+.str-chat__channel-header,
 .str-chat__input-flat,
-.str-chat__message-input {
+.str-chat__message-input,
+.str-chat__message-notification,
+.str-chat__jump-to-latest-message {
   display: none !important;
 }
 
-/* ── Stream Chat Window: fill container as flex column ── */
+/* Make Stream containers transparent and fill space */
 .str-chat,
-.str-chat__container {
-  height: 100% !important;
-  background: transparent !important;
-}
-
-.str-chat__main-panel {
-  display: flex !important;
-  flex-direction: column !important;
+.str-chat__container,
+.str-chat__channel {
   height: 100% !important;
   min-height: 0 !important;
   background: transparent !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
 }
 
+.str-chat__main-panel,
 .str-chat__main-panel-inner {
   display: flex !important;
   flex-direction: column !important;
   flex: 1 !important;
   min-height: 0 !important;
-}
-
-/* ── Message list: scrollable, anchored to bottom ── */
-.str-chat__list,
-.str-chat__message-list {
-  flex: 1 1 auto !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain !important;
-  -webkit-overflow-scrolling: touch !important;
-  padding: 8px 0 4px 0 !important;
   background: transparent !important;
 }
 
-/* Remove Stream default message padding/margins */
+/* Message list — transparent, scrollable */
+.str-chat__list,
+.str-chat__message-list,
+.str-chat__reverse-infinite-scroll {
+  background: transparent !important;
+  padding: 4px 0 !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.str-chat__list::-webkit-scrollbar,
+.str-chat__message-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* Remove all spacing from Stream message wrappers */
 .str-chat__li,
-.str-chat__message-simple {
+.str-chat__message-simple,
+.str-chat__message-simple-wrapper {
   padding: 0 !important;
   margin: 0 !important;
+  background: transparent !important;
 }
 
-/* Hide Stream default reaction selector */
+/* Hide all default Stream UI elements we replace */
 .str-chat__message-reactions-button,
-.str-chat__reaction-selector {
+.str-chat__reaction-selector,
+.str-chat__message-actions-box,
+.str-chat__message-options,
+.str-chat__avatar {
   display: none !important;
 }
 
-/* Hide Stream default action buttons */
-.str-chat__message-actions-box {
-  display: none !important;
-}
-
-/* Prevent iOS zoom on input focus (font-size >= 16px) */
-textarea, input[type="text"] {
+/* ══ Prevent iOS zoom on input (must be 16px+) ══ */
+textarea, input[type="text"], input[type="search"] {
   font-size: 16px !important;
 }
 
-/* ── Stream Video: full screen ── */
+/* ══ Stream Video ══ */
 .str-video,
 .str-video__call,
 .str-video__speaker-layout {
@@ -88,28 +98,12 @@ textarea, input[type="text"] {
   width: 100% !important;
 }
 
-/* ── Safe area for notch/home bar ── */
-.pt-safe {
-  padding-top: env(safe-area-inset-top, 0px);
-}
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 16px);
-}
-
-/* ── Typing bounce animation ── */
-@keyframes typingBounce {
+/* ══ Typing animation ══ */
+@keyframes tb {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
   30% { transform: translateY(-4px); opacity: 1; }
 }
 
-/* ── Pulse rings for voice call ── */
-@keyframes ping-slow {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.6); opacity: 0; }
-}
-
-/* ── Scrollbar hide on mobile ── */
-.str-chat__list::-webkit-scrollbar,
-.str-chat__message-list::-webkit-scrollbar {
-  display: none;
-}
+/* ══ Safe areas ══ */
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
