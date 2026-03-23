@@ -34,7 +34,7 @@ const App = () => {
   if (isLoading && !isPublicPath) return <PageLoader />;
 
   return (
-    <div className="h-screen overflow-hidden" data-theme={theme}>
+    <div className="h-full" data-theme={theme}>
       <Routes>
         <Route
           path="/"

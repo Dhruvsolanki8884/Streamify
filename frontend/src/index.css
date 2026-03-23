@@ -10,6 +10,8 @@ html, body {
   height: 100%;
 }
 
+/* #root must NOT be overflow:hidden — standalone pages (login, signup, profile)
+   need to scroll freely. Layout handles its own h-screen internally. */
 #root {
   height: 100%;
 }

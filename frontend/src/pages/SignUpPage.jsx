@@ -19,7 +19,7 @@ const SignUpPage = () => {
 
   return (
     <div
-      className="h-screen flex items-center justify-center p-4 sm:p-4 md:p-8"
+      className="min-h-screen flex items-center justify-center p-4 sm:p-4 md:p-8"
       data-theme="forest"
     >
       <div className="border border-primary/25 flex flex-col lg:flex-row w-full max-w-5xl mx-auto bg-base-100 rounded-xl shadow-lg overflow-hidden">
