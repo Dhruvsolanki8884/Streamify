@@ -580,8 +580,6 @@
 
 
 
-
-
 /**
  * ChatPage.jsx — WhatsApp-style chat, mobile-first
  * Features: fixed header, keyboard-safe layout, reply, copy,
@@ -613,6 +611,31 @@ import {
 import Avatar from "../components/Avatar";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
+
+/* ════════════════════════════════════════
+   VIEWPORT HEIGHT HOOK
+   Android Chrome: 100dvh includes the browser toolbar,
+   so the input gets hidden behind it.
+   visualViewport.height gives the TRUE visible height.
+════════════════════════════════════════ */
+const useVisibleHeight = () => {
+  const [h, setH] = useState(() => {
+    if (typeof window === "undefined") return 800;
+    return window.visualViewport?.height ?? window.innerHeight;
+  });
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setH(vv.height);
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+  return h;
+};
 
 /* ════════════════════════════════════════
    CONTEXT
@@ -1005,7 +1028,7 @@ const MsgInput = ({ channel }) => {
   };
 
   return (
-    <div className="flex-shrink-0" style={{ background: "#0b141a", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+    <div className="flex-shrink-0" style={{ background: "#0b141a" }}>
       {replyTo && <ReplyBanner replyTo={replyTo} onCancel={() => setReplyTo(null)} />}
 
       <div className="flex items-end gap-2 px-2 py-[10px]">
@@ -1114,6 +1137,7 @@ const ChatHeader = ({ user, userId, onVideo, onVoice }) => {
 ════════════════════════════════════════ */
 const ChatInner = ({ channel, targetUser, targetUserId, authUserId, onVideo, onVoice }) => {
   const listRef = useRef(null);
+  const vh = useVisibleHeight();
 
   // Scroll to bottom on mount and new messages
   const scrollBottom = useCallback(() => {
@@ -1123,6 +1147,9 @@ const ChatInner = ({ channel, targetUser, targetUserId, authUserId, onVideo, onV
   }, []);
 
   useEffect(() => { setTimeout(scrollBottom, 150); }, [scrollBottom]);
+
+  // Re-scroll when viewport shrinks (keyboard opens) — keeps latest msg visible
+  useEffect(() => { setTimeout(scrollBottom, 80); }, [vh, scrollBottom]);
 
   // Re-scroll when channel messages change
   useEffect(() => {
@@ -1164,6 +1191,8 @@ const ChatPage = () => {
   const [replyTo, setReplyTo] = useState(null);
   const { authUser } = useAuthUser();
   const { chatBackgroundValue } = useThemeStore();
+  // Use visualViewport height — the ONLY reliable way on Android Chrome
+  const vh = useVisibleHeight();
 
   const { data: td } = useQuery({ queryKey: ["streamToken"], queryFn: getStreamToken, enabled: !!authUser });
 
@@ -1220,16 +1249,21 @@ const ChatPage = () => {
       `}</style>
 
       {/*
-        THE KEY: height:100dvh shrinks when keyboard appears on mobile.
-        flex-col means: header(fixed) + messages(scroll) + input(fixed).
-        Nothing breaks when keyboard opens.
+        ROOT FIX: Use visualViewport height in pixels.
+        This is the ONLY approach that works on Android Chrome reliably.
+        - 100dvh on Android = includes browser toolbar = input hidden
+        - visualViewport.height = actual visible screen area
+        When keyboard opens → vh shrinks → layout reflows → input stays visible
       */}
       <div
         className="flex flex-col w-full overflow-hidden"
         style={{
-          height: "100dvh",
-          minHeight: "-webkit-fill-available",
+          height: `${vh}px`,
           background: chatBackgroundValue || "#0b141a",
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
         }}
       >
         <Chat client={chatClient}>

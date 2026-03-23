@@ -3,32 +3,31 @@
 @tailwind utilities;
 
 /* ════════════════════════════════════════
-   BASE — mobile foundation
+   BASE
 ════════════════════════════════════════ */
 html, body {
   overscroll-behavior: none;
   height: 100%;
-  min-height: -webkit-fill-available;
+  /* Prevent body scroll when chat input is focused on iOS */
+  overflow: hidden;
 }
 
 #root {
   height: 100%;
+  overflow: hidden;
 }
 
 /* ════════════════════════════════════════
-   iOS ZOOM FIX
-   Input focus zooms page if font-size < 16px
+   iOS ZOOM FIX — input focus must not zoom
+   font-size MUST be 16px or larger
 ════════════════════════════════════════ */
 input, textarea, select {
   font-size: 16px !important;
 }
 
 /* ════════════════════════════════════════
-   STREAM CHAT — global overrides
-   (ChatPage also inlines these for specificity)
+   STREAM CHAT — kill all default chrome
 ════════════════════════════════════════ */
-
-/* Hide all Stream default chrome */
 .str-chat__channel-header,
 .str-chat__input-flat,
 .str-chat__message-input,
@@ -42,7 +41,7 @@ input, textarea, select {
   display: none !important;
 }
 
-/* All Stream containers: transparent, flex column, fill height */
+/* Transparent flex containers — our layout takes over */
 .str-chat,
 .str-chat__container,
 .str-chat__channel {
@@ -63,7 +62,6 @@ input, textarea, select {
   background: transparent !important;
 }
 
-/* Message list — transparent, no extra spacing */
 .str-chat__list,
 .str-chat__message-list,
 .str-chat__reverse-infinite-scroll {
@@ -76,7 +74,6 @@ input, textarea, select {
   display: none;
 }
 
-/* Strip all Stream li/wrapper default spacing */
 .str-chat__li,
 .str-chat__message-simple,
 .str-chat__message-simple-wrapper {
@@ -86,7 +83,7 @@ input, textarea, select {
 }
 
 /* ════════════════════════════════════════
-   STREAM VIDEO — fill container
+   STREAM VIDEO
 ════════════════════════════════════════ */
 .str-video,
 .str-video__call,
@@ -108,9 +105,3 @@ input, textarea, select {
   70% { transform: scale(1.15); opacity: 0; }
   100% { transform: scale(1.15); opacity: 0; }
 }
-
-/* ════════════════════════════════════════
-   SAFE AREAS (notch / home bar)
-════════════════════════════════════════ */
-.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
-.pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
