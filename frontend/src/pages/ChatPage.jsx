@@ -423,11 +423,16 @@ const MsgInput = ({ channel }) => {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setBusy(true);
+    // Re-focus textarea BEFORE async send so keyboard never closes
+    // requestAnimationFrame ensures focus happens in the same user gesture
+    requestAnimationFrame(() => { ta.current?.focus(); });
     try {
       const p = { text: trimmed };
       if (replyTo) p.quoted_message_id = replyTo.id;
       await channel.sendMessage(p);
       setText(""); setReplyTo(null);
+      // Re-focus again after state update to keep keyboard open
+      requestAnimationFrame(() => { ta.current?.focus(); });
     } catch { toast.error("Failed to send"); }
     finally { setBusy(false); }
   };
@@ -455,6 +460,8 @@ const MsgInput = ({ channel }) => {
         <div className="relative flex-shrink-0">
           {showEmoji && <EmojiPicker onSelect={insertEmoji} onClose={() => setShowEmoji(false)} />}
           <button
+            onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={(e) => e.preventDefault()}
             onClick={() => setShowEmoji(v => !v)}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 ${showEmoji ? "bg-[#00a884]/20 text-[#00a884]" : "text-[#8696a0] hover:bg-white/8"}`}>
             <SmileIcon className="size-[22px]" />
@@ -473,19 +480,28 @@ const MsgInput = ({ channel }) => {
             placeholder="Message"
             className="flex-1 bg-transparent resize-none outline-none leading-[1.45] max-h-[130px] overflow-y-auto"
             style={{ fontSize: "16px", color: "#e9edef" }}
+            // Keep keyboard open: suppress blur when tapping send/emoji buttons
+            // (those buttons use onPointerDown preventDefault, so blur won't fire from them)
           />
         </div>
 
         {/* Send / Mic button */}
         <div className="flex-shrink-0">
           {text.trim() ? (
-            <button onClick={send} disabled={busy}
+            <button
+              onMouseDown={(e) => e.preventDefault()} // prevent textarea blur on desktop
+              onPointerDown={(e) => e.preventDefault()} // prevent textarea blur on mobile
+              onClick={send}
+              disabled={busy}
               className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 disabled:opacity-50 transition-all shadow-lg"
               style={{ background: "#00a884" }}>
               <SendIcon className="size-5 text-white ml-0.5" />
             </button>
           ) : (
-            <button className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-lg"
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onPointerDown={(e) => e.preventDefault()}
+              className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-lg"
               style={{ background: "#00a884" }}>
               <MicIcon className="size-5 text-white" />
             </button>
@@ -653,37 +669,10 @@ const ChatPage = () => {
     })();
   }, [td, authUser, targetUserId]);
 
-  const startCall = useCallback(async (type) => {
-    if (!channel || !authUser || !td?.token) return;
-    try {
-      // Import StreamVideoClient lazily to avoid loading it on every chat open
-      const { StreamVideoClient } = await import("@stream-io/video-react-sdk");
-      const vc = new StreamVideoClient({
-        apiKey: STREAM_API_KEY,
-        user: { id: authUser._id, name: authUser.fullName, image: authUser.profilePic },
-        token: td.token,
-      });
-      // Create call and RING the other user — this triggers their IncomingCall popup
-      const ci = vc.call("default", channel.id);
-      await ci.getOrCreate({
-        ring: true,
-        data: {
-          members: [
-            { user_id: authUser._id },
-            { user_id: targetUserId },
-          ],
-          custom: { type },
-        },
-      });
-      // Disconnect video client — CallPage will create its own
-      await vc.disconnectUser();
-    } catch (e) {
-      console.error("Ring error:", e);
-      toast.error("Could not start call");
-      return;
-    }
+  const startCall = useCallback((type) => {
+    if (!channel || !authUser) return;
     navigate(`/call/${channel.id}${type === "voice" ? "?audio=true" : ""}`);
-  }, [channel, authUser, td, targetUserId, navigate]);
+  }, [channel, authUser, navigate]);
 
   if (loading || !chatClient || !channel) return <ChatLoader />;
 
