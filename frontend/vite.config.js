@@ -3,8 +3,18 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5173,
+    // Fix HMR WebSocket connection issues
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 5173,
+    },
+    // Allow connections from any host (needed for mobile testing)
+    host: true,
+  },
   build: {
-    // Split large vendor chunks for better caching
     rollupOptions: {
       output: {
         manualChunks: {
@@ -17,11 +27,8 @@ export default defineConfig({
         },
       },
     },
-    // Increase chunk size warning limit (stream SDKs are large)
     chunkSizeWarningLimit: 1000,
-    // Enable source maps for production debugging
     sourcemap: false,
-    // Minify
     minify: 'esbuild',
   },
 })

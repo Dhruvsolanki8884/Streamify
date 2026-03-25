@@ -1,10 +1,3 @@
-/**
- * ChatPage.jsx — WhatsApp-style chat, mobile-first
- * Features: fixed header, keyboard-safe layout, reply, copy,
- *           emoji picker, call log bubbles, typing indicator,
- *           read receipts, reactions, smooth scroll
- */
-
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router";
 import { getStreamToken } from "../lib/api";
@@ -30,13 +23,6 @@ import Avatar from "../components/Avatar";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
 
-/* ════════════════════════════════════════
-   VIEWPORT HOOK — keyboard-aware layout
-   On Android Chrome, keyboard open causes:
-     - visualViewport.height shrinks → use for container height
-     - visualViewport.offsetTop shifts → use for `top` position
-   Together: layout NEVER moves, input always visible.
-════════════════════════════════════════ */
 const useViewport = () => {
   const [vp, setVp] = useState(() => ({
     height: window.visualViewport?.height ?? window.innerHeight,
@@ -390,17 +376,39 @@ const DateSep = ({ date }) => {
 
 /* ════════════════════════════════════════
    ONLINE STATUS  (needs Channel context)
+   Shows "typing..." when peer is typing — WhatsApp style
 ════════════════════════════════════════ */
-const OnlineStatus = ({ userId }) => {
+const OnlineStatus = ({ userId, myId }) => {
   const { channel } = useChannelStateContext();
   const [online, setOnline] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+
   useEffect(() => {
     if (!channel || !userId) return;
     setOnline(channel.state?.members?.[userId]?.user?.online ?? false);
-    const fn = (e) => { if (e.user?.id === userId) setOnline(e.user.online ?? false); };
-    channel.on("user.presence.changed", fn);
-    return () => channel.off("user.presence.changed", fn);
+    const onPresence = (e) => { if (e.user?.id === userId) setOnline(e.user.online ?? false); };
+    channel.on("user.presence.changed", onPresence);
+    return () => channel.off("user.presence.changed", onPresence);
   }, [channel, userId]);
+
+  useEffect(() => {
+    if (!channel || !myId) return;
+    const fn = () => {
+      const typingUsers = Object.values(channel.state?.typing || {});
+      setIsTyping(typingUsers.some(u => u.user?.id !== myId));
+    };
+    channel.on("typing.start", fn);
+    channel.on("typing.stop", fn);
+    return () => { channel.off("typing.start", fn); channel.off("typing.stop", fn); };
+  }, [channel, myId]);
+
+  if (isTyping) {
+    return (
+      <span className="text-[11px] font-normal flex items-center gap-1" style={{ color: "#00a884" }}>
+        typing...
+      </span>
+    );
+  }
   return (
     <span className="text-[11px] font-normal" style={{ color: online ? "#00a884" : "#8696a0" }}>
       {online ? "online" : "offline"}
@@ -424,7 +432,7 @@ const Typing = ({ channel, myId }) => {
     <div className="flex justify-start px-3 pb-2">
       <div className="rounded-[16px] rounded-tl-[4px] px-3 py-2 flex gap-1 items-center shadow-sm" style={{ background: "#202c33" }}>
         {[0, 1, 2].map(i => (
-          <span key={i} className="w-[6px] h-[6px] rounded-full" style={{ background: "#8696a0", animation: "waDot 1.2s infinite", animationDelay: `${i * 0.2}s` }} />
+          <span key={i} className="w-[6px] h-[6px] rounded-full" style={{ background: "#c1ccd3ff", animation: "waDot 1.2s infinite", animationDelay: `${i * 0.2}s` }} />
         ))}
       </div>
     </div>
@@ -565,7 +573,7 @@ const MsgInput = ({ channel }) => {
 /* ════════════════════════════════════════
    CHAT HEADER  (inside Channel context)
 ════════════════════════════════════════ */
-const ChatHeader = ({ user, userId, onVideo, onVoice }) => {
+const ChatHeader = ({ user, userId, authUserId, onVideo, onVoice }) => {
   const navigate = useNavigate();
   const name = user?.name || user?.fullName || "Loading...";
   const avatar = user?.image || user?.profilePic;
@@ -579,20 +587,17 @@ const ChatHeader = ({ user, userId, onVideo, onVoice }) => {
         paddingLeft: "4px",
         paddingRight: "4px",
       }}>
-      {/* Back */}
       <button onClick={() => navigate(-1)}
         className="p-2 rounded-full text-[#aebac1] hover:bg-white/10 active:bg-white/20 flex-shrink-0 transition-colors">
         <ArrowLeftIcon className="size-5" />
       </button>
-
-      {/* Avatar + Name + Status */}
       <div className="flex items-center gap-[10px] flex-1 min-w-0 py-1 px-1 rounded-xl cursor-pointer active:bg-white/5 transition-colors">
         <div className="flex-shrink-0">
           <Avatar src={avatar} alt={name} size="sm" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold truncate leading-[1.2]" style={{ color: "#e9edef" }}>{name}</p>
-          {userId && <OnlineStatus userId={userId} />}
+          {userId && <OnlineStatus userId={userId} myId={authUserId} />}
         </div>
       </div>
 
@@ -642,7 +647,7 @@ const ChatInner = ({ channel, targetUser, targetUserId, authUserId, onVideo, onV
 
   return (
     <>
-      <ChatHeader user={targetUser} userId={targetUserId} onVideo={onVideo} onVoice={onVoice} />
+      <ChatHeader user={targetUser} userId={targetUserId} authUserId={authUserId} onVideo={onVideo} onVoice={onVoice} />
 
       {/* ── Messages — only this div scrolls ── */}
       <div
@@ -670,9 +675,8 @@ const ChatPage = () => {
   const [loading, setLoading] = useState(true);
   const [targetUser, setTargetUser] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
-  const { authUser } = useAuthUser();
+  const { authUser, isLoading: authLoading } = useAuthUser();
   const { chatBackgroundValue } = useThemeStore();
-  // Track exact viewport size+offset — works on Android Chrome with keyboard
   const { height: vh, offsetTop } = useViewport();
 
   const { data: td } = useQuery({ queryKey: ["streamToken"], queryFn: getStreamToken, enabled: !!authUser });
@@ -682,8 +686,13 @@ const ChatPage = () => {
     (async () => {
       try {
         const c = StreamChat.getInstance(STREAM_API_KEY);
-        if (c.userID !== authUser._id)
-          await c.connectUser({ id: authUser._id, name: authUser.fullName, image: authUser.profilePic }, td.token);
+        // Only connect if not already connected — prevents "connectUser called twice" error
+        if (!c.userID) {
+          await c.connectUser(
+            { id: authUser._id, name: authUser.fullName, image: authUser.profilePic },
+            td.token
+          );
+        }
         const { users } = await c.queryUsers({ id: { $eq: targetUserId } });
         if (users[0]) setTargetUser(users[0]);
         const ch = c.channel("messaging", [authUser._id, targetUserId].sort().join("-"), { members: [authUser._id, targetUserId] });
@@ -741,7 +750,7 @@ const ChatPage = () => {
     navigate(`/call/${channel.id}${!isVideo ? "?audio=true" : ""}`);
   }, [channel, authUser, navigate]);
 
-  if (loading || !chatClient || !channel) return <ChatLoader />;
+  if (authLoading || loading || !chatClient || !channel) return <ChatLoader />;
 
   return (
     <RC.Provider value={{ replyTo, setReplyTo }}>

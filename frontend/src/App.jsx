@@ -19,6 +19,8 @@ import { useThemeStore } from "./Store/useThemeStore.js";
 
 // Routes that should render immediately without waiting for auth check
 const PUBLIC_PATHS = ["/signup", "/login"];
+// Routes that should render even while auth is loading (they handle their own loading state)
+const STANDALONE_PATHS = ["/chat/", "/call/", "/onboarding", "/profile", "/notifications"];
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -27,11 +29,12 @@ const App = () => {
   const isAuthenticated = Boolean(authUser);
   const isOnboarded = authUser?.isOnboarded;
 
-  // Only block on loading for protected routes — public pages show instantly
   const currentPath = window.location.pathname;
   const isPublicPath = PUBLIC_PATHS.some((p) => currentPath.startsWith(p));
+  const isStandalonePath = STANDALONE_PATHS.some((p) => currentPath.startsWith(p));
 
-  if (isLoading && !isPublicPath) return <PageLoader />;
+  // Only block on loading for layout pages — standalone pages handle their own state
+  if (isLoading && !isPublicPath && !isStandalonePath) return <PageLoader />;
 
   return (
     <div className="h-full" data-theme={theme}>
@@ -101,24 +104,20 @@ const App = () => {
         <Route
           path="/call/:id"
           element={
-            isLoading ? (
-              <PageLoader />
-            ) : isAuthenticated && isOnboarded ? (
-              <CallPage />
+            !isLoading && !isAuthenticated ? (
+              <Navigate to="/login" />
             ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
+              <CallPage />
             )
           }
         />
         <Route
           path="/chat/:id"
           element={
-            isLoading ? (
-              <PageLoader />
-            ) : isAuthenticated && isOnboarded ? (
-              <ChatPage />
+            !isLoading && !isAuthenticated ? (
+              <Navigate to="/login" />
             ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
+              <ChatPage />
             )
           }
         />
