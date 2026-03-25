@@ -28,6 +28,7 @@ const HomePage = () => {
   const { authUser } = useAuthUser();
   const queryClient = useQueryClient();
   const [outgoingRequestsIds, setOutgoingRequestsIds] = useState(new Set());
+  const [pendingUserId, setPendingUserId] = useState(null);
 
   const { data: friends = [], isLoading: loadingFriends } = useQuery({
     queryKey: ["friends"],
@@ -51,10 +52,13 @@ const HomePage = () => {
 
   const incomingCount = friendRequests?.incomingReqs?.length || 0;
 
-  const { mutate: sendRequestMutation, isPending } = useMutation({
+  const { mutate: sendRequestMutation } = useMutation({
     mutationFn: sendFriendRequest,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["outgoingFriendReqs"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["outgoingFriendReqs"] });
+      setPendingUserId(null);
+    },
+    onError: () => setPendingUserId(null),
   });
 
   useEffect(() => {
@@ -214,13 +218,21 @@ const HomePage = () => {
                             ? "btn-ghost btn-disabled"
                             : "btn-primary"
                         }`}
-                        onClick={() => sendRequestMutation(user._id)}
-                        disabled={hasRequestBeenSent || isPending}
+                        onClick={() => {
+                          setPendingUserId(user._id);
+                          sendRequestMutation(user._id);
+                        }}
+                        disabled={hasRequestBeenSent || pendingUserId === user._id}
                       >
                         {hasRequestBeenSent ? (
                           <>
                             <CheckCircleIcon className="size-4 mr-2" />
                             Request Sent
+                          </>
+                        ) : pendingUserId === user._id ? (
+                          <>
+                            <span className="loading loading-spinner loading-xs mr-2" />
+                            Sending...
                           </>
                         ) : (
                           <>

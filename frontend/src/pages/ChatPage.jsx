@@ -177,23 +177,71 @@ const MsgMenu = ({ message, isMine, onReact, onClose, onReply, myRT }) => {
    CALL LOG BUBBLE
 ════════════════════════════════════════ */
 const CallLogBubble = ({ message }) => {
+  const { isMyMessage } = useMessageContext();
+  const isMine = isMyMessage();
   const isVideo = message.call_type === "video" || message.text?.toLowerCase().includes("video");
+  const isMissed = message.call_missed === true || message.text?.toLowerCase() === "missed call";
   const dur = message.call_duration;
   const time = new Date(message.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-  const durStr = !dur ? "" : dur >= 60 ? `${Math.floor(dur / 60)} min ${dur % 60} sec` : `${dur} sec`;
+
+  // Format duration
+  let durStr = "";
+  if (dur > 0) {
+    const h = Math.floor(dur / 3600);
+    const m = Math.floor((dur % 3600) / 60);
+    const s = dur % 60;
+    if (h > 0) durStr = `${h}h ${m}m ${s}s`;
+    else if (m > 0) durStr = `${m} min ${s} sec`;
+    else durStr = `${s} sec`;
+  }
+
+  // Label
+  const direction = message.call_direction;
+  const isOutgoing = direction ? direction === "outgoing" : isMine;
+
+  let label, iconColor, bubbleBg;
+  if (isMissed) {
+    label = "Missed call";
+    iconColor = "#ef4444";
+    bubbleBg = isMine ? "#1a1a2e" : "#1a1a2e";
+  } else if (isOutgoing) {
+    label = isVideo ? "Outgoing video call" : "Outgoing voice call";
+    iconColor = "rgba(255,255,255,0.7)";
+    bubbleBg = isMine ? "#005c4b" : "#202c33";
+  } else {
+    label = isVideo ? "Incoming video call" : "Incoming voice call";
+    iconColor = "rgba(255,255,255,0.7)";
+    bubbleBg = isMine ? "#005c4b" : "#202c33";
+  }
+
   return (
-    <div className="flex justify-end w-full px-3 mb-1">
-      <div className="flex items-center gap-3 px-3 py-2.5 rounded-[16px] rounded-tr-[4px]"
-        style={{ background: "#005c4b", minWidth: 185, maxWidth: 265 }}>
+    <div className={`flex w-full px-3 mb-1 ${isMine ? "justify-end" : "justify-start"}`}>
+      <div
+        className="flex items-center gap-3 px-3 py-2.5"
+        style={{
+          background: bubbleBg,
+          borderRadius: isMine ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
+          minWidth: 185,
+          maxWidth: 265,
+          border: isMissed ? "1px solid rgba(239,68,68,0.3)" : "none",
+        }}
+      >
         <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: "rgba(255,255,255,0.1)" }}>
+          style={{ background: isMissed ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.1)" }}>
           {isVideo
-            ? <VideoIcon className="size-5" style={{ color: "rgba(255,255,255,0.7)" }} />
-            : <PhoneIcon className="size-5" style={{ color: "rgba(255,255,255,0.7)" }} />}
+            ? <VideoIcon className="size-5" style={{ color: iconColor }} />
+            : <PhoneIcon className="size-5" style={{ color: iconColor }} />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm">{isVideo ? "Video call" : "Voice call"}</p>
-          {durStr && <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>{durStr}</p>}
+          {/* Missed call label in RED */}
+          <p className="font-semibold text-sm" style={{ color: isMissed ? "#ef4444" : "white" }}>
+            {label}
+          </p>
+          {durStr
+            ? <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>{durStr}</p>
+            : isMissed
+              ? null
+              : <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>No answer</p>}
         </div>
         <span className="text-[10px] self-end flex-shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>{time}</span>
       </div>
@@ -214,6 +262,8 @@ const CustomMessage = () => {
   // Special message types
   if (message.call_log) return <CallLogBubble message={message} />;
   if (message.text?.includes("/call/") && message.text?.includes("started a")) return null;
+  // Hide deleted messages entirely — no "This message was deleted" text
+  if (message.type === "deleted" || message.deleted_at) return null;
   if (!message.text) return null;
 
   const time = new Date(message.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -669,9 +719,26 @@ const ChatPage = () => {
     })();
   }, [td, authUser, targetUserId]);
 
-  const startCall = useCallback((type) => {
+  const startCall = useCallback(async (type) => {
     if (!channel || !authUser) return;
-    navigate(`/call/${channel.id}${type === "voice" ? "?audio=true" : ""}`);
+    const isVideo = type === "video";
+    // Send a custom chat event — IncomingCall.jsx on the receiver's side listens for this
+    try {
+      await channel.sendEvent({
+        type: "call_initiated",
+        callId: channel.id,
+        callerId: authUser._id,
+        callerName: authUser.fullName,
+        callerImage: authUser.profilePic || "",
+        isVideo,
+        channelId: channel.id,
+      });
+    } catch (e) {
+      console.error("Failed to send call event:", e);
+      toast.error("Could not start call");
+      return;
+    }
+    navigate(`/call/${channel.id}${!isVideo ? "?audio=true" : ""}`);
   }, [channel, authUser, navigate]);
 
   if (loading || !chatClient || !channel) return <ChatLoader />;

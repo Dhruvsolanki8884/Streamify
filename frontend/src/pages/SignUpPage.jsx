@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ShipWheelIcon } from "lucide-react";
+import { ShipWheelIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { Link } from "react-router";
 import useSignUp from "../hooks/useSignUp";
 
@@ -9,7 +9,7 @@ const SignUpPage = () => {
     email: "",
     password: "",
   });
-
+  const [showPassword, setShowPassword] = useState(false);
   const { isPending, error, signupMutation } = useSignUp();
 
   const handleSignup = (e) => {
@@ -91,22 +91,28 @@ const SignUpPage = () => {
                     <label className="label">
                       <span className="label-text">Password</span>
                     </label>
-                    <input
-                      type="password"
-                      placeholder="Enter your password"
-                      className="input input-bordered w-full"
-                      name="password"
-                      value={signupData.password}
-                      onChange={(e) =>
-                        setSignupData({
-                          ...signupData,
-                          password: e.target.value,
-                        })
-                      }
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        className="input input-bordered w-full pr-10"
+                        name="password"
+                        value={signupData.password}
+                        onChange={(e) =>
+                          setSignupData({ ...signupData, password: e.target.value })
+                        }
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50 hover:text-base-content transition-colors"
+                      >
+                        {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                      </button>
+                    </div>
                     <p className="text-xs opacity-70 mt-1">
-                      password must be at least 6 characters long
+                      Password must be at least 6 characters long
                     </p>
                   </div>
                   <div className="form-control">
