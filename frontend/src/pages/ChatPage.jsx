@@ -656,7 +656,7 @@ const ChatInner = ({ channel, targetUser, targetUserId, authUserId, onVideo, onV
         style={{ minHeight: 0, WebkitOverflowScrolling: "touch" }}
       >
         <MessageList />
-        <Typing channel={channel} myId={authUserId} />
+        {/* Typing indicator is shown in the header (WhatsApp style) — not as a bubble */}
       </div>
 
       <MsgInput channel={channel} />

@@ -14,6 +14,7 @@ import PageLoader from "../components/pageLoader.jsx";
 import {
   PhoneOffIcon, MicIcon, MicOffIcon,
   VideoIcon, VideoOffIcon, Volume2Icon, VolumeXIcon,
+  RotateCcwIcon,
 } from "lucide-react";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
@@ -26,142 +27,164 @@ const fmtDur = secs => {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
-/* ══════════════════════════════════════
-   TIMER — ticks only when active=true
-   Resets to 0 when deactivated
-══════════════════════════════════════ */
+/* ── Timer ── */
 const Timer = ({ active, label }) => {
   const [secs, setSecs] = useState(0);
-
   useEffect(() => {
     if (!active) { setSecs(0); return; }
     const id = setInterval(() => setSecs(s => s + 1), 1000);
     return () => clearInterval(id);
   }, [active]);
 
-  if (!active) {
-    return (
-      <span className="text-sm animate-pulse" style={{ color: "rgba(255,255,255,0.5)" }}>
-        {label}
-      </span>
-    );
-  }
+  if (!active) return (
+    <span className="text-sm animate-pulse" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</span>
+  );
   return (
-    <span className="text-sm font-mono tracking-wide" style={{ color: "rgba(255,255,255,0.8)" }}>
+    <span className="text-sm font-mono tracking-wide" style={{ color: "rgba(255,255,255,0.85)" }}>
       {fmtDur(secs)}
     </span>
   );
 };
 
-/* ══════════════════════════════════════
-   CONTROL BUTTON — active = highlighted red
-══════════════════════════════════════ */
-const CtrlBtn = ({ active, onClick, Icon, ActiveIcon, label }) => (
-  <div className="flex flex-col items-center gap-2">
-    <button
-      onClick={onClick}
-      className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 shadow-md"
-      style={{
-        background: active ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.15)",
-        border: active ? "1.5px solid rgba(239,68,68,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
-      }}
-    >
-      {active
-        ? <ActiveIcon className="size-6" style={{ color: "#f87171" }} />
-        : <Icon className="size-6 text-white" />}
-    </button>
-    <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span>
-  </div>
-);
-
-/* ══════════════════════════════════════
-   SPEAKER BUTTON — toggles audio output
-   Active = speaker ON (highlighted green)
-══════════════════════════════════════ */
-const SpeakerBtn = () => {
-  const [speakerOn, setSpeakerOn] = useState(true);
-
-  const toggle = useCallback(async () => {
-    const next = !speakerOn;
-    setSpeakerOn(next);
-    // On mobile browsers, we can't programmatically switch audio output
-    // but we can mute/unmute all remote audio elements as a workaround
-    document.querySelectorAll("audio").forEach(el => { el.muted = !next; });
-    document.querySelectorAll("video:not([muted])").forEach(el => { el.muted = !next; });
-  }, [speakerOn]);
-
+/* ── Generic round button ── */
+const RoundBtn = ({ active, activeColor = "#ef4444", onClick, children, label, size = "sm" }) => {
+  const dim = size === "lg" ? "w-[70px] h-[70px]" : "w-14 h-14";
   return (
     <div className="flex flex-col items-center gap-2">
       <button
-        onClick={toggle}
-        className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 shadow-md"
+        onClick={onClick}
+        className={`${dim} rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 shadow-md`}
         style={{
-          background: speakerOn ? "rgba(0,168,132,0.25)" : "rgba(255,255,255,0.15)",
-          border: speakerOn ? "1.5px solid rgba(0,168,132,0.6)" : "1.5px solid rgba(255,255,255,0.1)",
+          background: active ? `${activeColor}33` : "rgba(255,255,255,0.15)",
+          border: active ? `1.5px solid ${activeColor}99` : "1.5px solid rgba(255,255,255,0.12)",
+          boxShadow: active ? `0 0 18px ${activeColor}44` : "none",
         }}
       >
-        {speakerOn
-          ? <Volume2Icon className="size-6" style={{ color: "#00a884" }} />
-          : <VolumeXIcon className="size-6 text-white" />}
+        {children}
       </button>
-      <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-        {speakerOn ? "Speaker" : "Muted"}
-      </span>
+      {label && <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span>}
     </div>
   );
 };
 
-/* ══════════════════════════════════════
-   CONTROLS BAR
-══════════════════════════════════════ */
-const Controls = ({ isAudioOnly, onEnd }) => {
+/* ── Controls bar ── */
+const Controls = ({ isAudioOnly, onEnd, call }) => {
   const { useMicrophoneState, useCameraState } = useCallStateHooks();
   const { microphone, isMute: micOff } = useMicrophoneState();
   const { camera, isMute: camOff } = useCameraState();
 
+  // Speaker state — default OFF (earpiece mode like a real phone call)
+  const [speakerOn, setSpeakerOn] = useState(false);
+  // Camera facing — "user" = front, "environment" = back
+  const [facingMode, setFacingMode] = useState("user");
+
+  // Toggle speaker using setSinkId where supported, with proper mobile fallback
+  const toggleSpeaker = useCallback(async () => {
+    const next = !speakerOn;
+    setSpeakerOn(next);
+    try {
+      const audioEls = Array.from(document.querySelectorAll("audio"));
+      const videoEls = Array.from(document.querySelectorAll("video")).filter(v => !v.muted);
+
+      for (const el of [...audioEls, ...videoEls]) {
+        // Always ensure audio is NOT muted regardless of speaker state
+        el.muted = false;
+        el.volume = 1.0;
+
+        if (typeof el.setSinkId === "function") {
+          // Desktop Chrome / some Android: route to speaker or default output
+          await el.setSinkId(next ? "default" : "").catch(() => {});
+        }
+        // On iOS/Android without setSinkId: we can't switch hardware output
+        // but we ensure max volume and unmuted state so audio is always audible
+      }
+    } catch { /* silent */ }
+  }, [speakerOn]);
+
+  // Switch front/back camera
+  const switchCamera = useCallback(async () => {
+    if (!call) return;
+    const next = facingMode === "user" ? "environment" : "user";
+    setFacingMode(next);
+    try {
+      // Stream SDK camera flip
+      await call.camera.flip();
+    } catch {
+      // Fallback: restart camera with new constraints
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: next },
+          audio: false,
+        });
+        stream.getTracks().forEach(t => t.stop());
+      } catch { /* silent */ }
+    }
+  }, [call, facingMode]);
+
   return (
-    <div className="flex items-center justify-center gap-7 py-8 px-6">
-      {/* Mute */}
-      <CtrlBtn
+    <div className="flex items-center justify-center gap-5 py-8 px-4">
+      {/* Mute mic */}
+      <RoundBtn
         active={micOff}
         onClick={() => micOff ? microphone.enable() : microphone.disable()}
-        Icon={MicIcon}
-        ActiveIcon={MicOffIcon}
         label={micOff ? "Unmute" : "Mute"}
-      />
+      >
+        {micOff
+          ? <MicOffIcon className="size-6" style={{ color: "#f87171" }} />
+          : <MicIcon className="size-6 text-white" />}
+      </RoundBtn>
 
       {/* End call */}
       <div className="flex flex-col items-center gap-2">
         <button
           onClick={onEnd}
           className="w-[70px] h-[70px] rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
-          style={{ background: "#ef4444", boxShadow: "0 0 28px rgba(239,68,68,0.55)" }}
+          style={{ background: "#ef4444", boxShadow: "0 0 28px rgba(239,68,68,0.6)" }}
         >
           <PhoneOffIcon className="size-7 text-white" />
         </button>
         <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>End</span>
       </div>
 
-      {/* Camera (video) or Speaker (audio) */}
       {!isAudioOnly ? (
-        <CtrlBtn
-          active={camOff}
-          onClick={() => camOff ? camera.enable() : camera.disable()}
-          Icon={VideoIcon}
-          ActiveIcon={VideoOffIcon}
-          label={camOff ? "Cam off" : "Camera"}
-        />
+        /* Video call: camera toggle + camera switch */
+        <>
+          <RoundBtn
+            active={camOff}
+            onClick={() => camOff ? camera.enable() : camera.disable()}
+            label={camOff ? "Cam off" : "Camera"}
+          >
+            {camOff
+              ? <VideoOffIcon className="size-6" style={{ color: "#f87171" }} />
+              : <VideoIcon className="size-6 text-white" />}
+          </RoundBtn>
+          <RoundBtn
+            active={false}
+            onClick={switchCamera}
+            label="Flip"
+          >
+            <RotateCcwIcon className="size-5 text-white" />
+          </RoundBtn>
+        </>
       ) : (
-        <SpeakerBtn />
+        /* Voice call: speaker toggle */
+        <RoundBtn
+          active={speakerOn}
+          activeColor="#00a884"
+          onClick={toggleSpeaker}
+          label={speakerOn ? "Speaker" : "Earpiece"}
+        >
+          {speakerOn
+            ? <Volume2Icon className="size-6" style={{ color: "#00a884" }} />
+            : <VolumeXIcon className="size-6 text-white" />}
+        </RoundBtn>
       )}
     </div>
   );
 };
 
-/* ══════════════════════════════════════
-   CALL CONTENT  (inside StreamCall context)
-══════════════════════════════════════ */
-const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) => {
+/* ── Call content (inside StreamCall context) ── */
+const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed, call }) => {
   const { useCallCallingState, useParticipants, useLocalParticipant } = useCallStateHooks();
   const state = useCallCallingState();
   const participants = useParticipants();
@@ -169,8 +192,6 @@ const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) 
   const navigate = useNavigate();
 
   const remotes = participants.filter(p => !p.isLocalParticipant);
-
-  // Timer starts ONLY when both users are in the call
   const iJoined = state === CallingState.JOINED;
   const bothConnected = iJoined && remotes.length > 0;
 
@@ -178,7 +199,7 @@ const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) 
   const missedTimerRef = useRef(null);
   const missedFiredRef = useRef(false);
 
-  // Record exact moment both connected
+  // Start timer only when BOTH are connected
   useEffect(() => {
     if (bothConnected && !startTimeRef.current) {
       startTimeRef.current = Date.now();
@@ -186,7 +207,7 @@ const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) 
     }
   }, [bothConnected]);
 
-  // 30s no-answer → missed call
+  // 30s no-answer → missed
   useEffect(() => {
     if (!iJoined || bothConnected) return;
     missedTimerRef.current = setTimeout(() => {
@@ -198,20 +219,16 @@ const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) 
     return () => clearTimeout(missedTimerRef.current);
   }, [iJoined, bothConnected, onMissed]);
 
-  // Navigate back when call ends
   useEffect(() => {
     if (state === CallingState.LEFT) navigate(-1);
   }, [state, navigate]);
 
   if (state === CallingState.LEFT) return null;
 
-  // Status label — shown instead of timer when not yet connected
-  const statusLabel = (() => {
-    if (bothConnected) return null; // timer shows
-    if (state === CallingState.JOINING) return "Connecting...";
-    if (iJoined && remotes.length === 0) return "Ringing...";
-    return "Calling...";
-  })();
+  const statusLabel = bothConnected ? null
+    : state === CallingState.JOINING ? "Connecting..."
+    : iJoined ? "Ringing..."
+    : "Calling...";
 
   const endCall = async () => {
     const dur = startTimeRef.current
@@ -224,55 +241,39 @@ const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) 
 
   return (
     <div className="flex flex-col" style={{ height: "100dvh", background: "#0d1117" }}>
-
-      {/* ── Top: name + timer/status ── */}
-      <div
-        className="absolute top-0 left-0 right-0 z-20 px-5 pb-4"
-        style={{
-          paddingTop: "max(20px, env(safe-area-inset-top, 20px))",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)",
-        }}
-      >
+      {/* Top overlay */}
+      <div className="absolute top-0 left-0 right-0 z-20 px-5 pb-4"
+        style={{ paddingTop: "max(20px, env(safe-area-inset-top, 20px))", background: "linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)" }}>
         <p className="text-white font-semibold text-base leading-tight">{peerName}</p>
         <Timer active={bothConnected} label={statusLabel || "Calling..."} />
       </div>
 
-      {/* ── Media area ── */}
+      {/* Media */}
       <div className="flex-1 relative overflow-hidden">
         {isAudioOnly ? (
-          /* Voice call UI */
-          <div
-            className="w-full h-full flex flex-col items-center justify-center gap-6"
-            style={{ background: "linear-gradient(160deg, #1a2630, #0d1117)" }}
-          >
-            {/* Hidden audio — ParticipantView binds the audio stream */}
+          <div className="w-full h-full flex flex-col items-center justify-center gap-6"
+            style={{ background: "linear-gradient(160deg, #1a2630, #0d1117)" }}>
+            {/* Bind audio streams */}
             {remotes.map(p => (
               <div key={p.sessionId} className="sr-only" aria-hidden>
                 <ParticipantView participant={p} trackType="audioTrack" />
               </div>
             ))}
-
-            {/* Pulse rings + avatar */}
             <div className="relative flex items-center justify-center">
               <div className="absolute rounded-full animate-ping"
                 style={{ width: 210, height: 210, background: "rgba(0,168,132,0.07)", animationDuration: "2.2s" }} />
               <div className="absolute rounded-full animate-ping"
                 style={{ width: 168, height: 168, background: "rgba(0,168,132,0.11)", animationDuration: "2.2s", animationDelay: "0.55s" }} />
-              <div
-                className="w-32 h-32 rounded-full overflow-hidden shadow-2xl relative z-10"
-                style={{ border: "3px solid rgba(0,168,132,0.5)", boxShadow: "0 0 40px rgba(0,168,132,0.2)" }}
-              >
+              <div className="w-32 h-32 rounded-full overflow-hidden shadow-2xl relative z-10"
+                style={{ border: "3px solid rgba(0,168,132,0.5)", boxShadow: "0 0 40px rgba(0,168,132,0.2)" }}>
                 {peerImage
                   ? <img src={peerImage} alt={peerName} className="w-full h-full object-cover" />
-                  : (
-                    <div className="w-full h-full flex items-center justify-center text-5xl font-bold text-white"
+                  : <div className="w-full h-full flex items-center justify-center text-5xl font-bold text-white"
                       style={{ background: "linear-gradient(135deg,#00a884,#025144)" }}>
                       {peerName?.charAt(0)?.toUpperCase() || "?"}
-                    </div>
-                  )}
+                    </div>}
               </div>
             </div>
-
             <div className="text-center">
               <p className="text-white text-2xl font-semibold">{peerName}</p>
               <div className="mt-2">
@@ -281,33 +282,23 @@ const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) 
             </div>
           </div>
         ) : (
-          /* Video call UI */
           <div className="w-full h-full">
             {remotes.length > 0 ? (
-              /* Remote full-screen */
               <div className="w-full h-full">
-                <ParticipantView
-                  participant={remotes[0]}
-                  className="w-full h-full object-cover"
-                  trackType="videoTrack"
-                />
+                <ParticipantView participant={remotes[0]}
+                  className="w-full h-full object-cover" trackType="videoTrack" />
               </div>
             ) : (
-              /* Waiting for remote */
-              <div
-                className="w-full h-full flex flex-col items-center justify-center gap-4"
-                style={{ background: "linear-gradient(160deg, #1a2630, #0d1117)" }}
-              >
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4"
+                style={{ background: "linear-gradient(160deg, #1a2630, #0d1117)" }}>
                 <div className="w-28 h-28 rounded-full overflow-hidden shadow-2xl"
                   style={{ border: "3px solid rgba(0,168,132,0.4)" }}>
                   {peerImage
                     ? <img src={peerImage} alt={peerName} className="w-full h-full object-cover" />
-                    : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-white"
+                    : <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-white"
                         style={{ background: "linear-gradient(135deg,#00a884,#025144)" }}>
                         {peerName?.charAt(0)?.toUpperCase()}
-                      </div>
-                    )}
+                      </div>}
                 </div>
                 <p className="text-white text-xl font-medium">{peerName}</p>
                 <p className="text-sm animate-pulse" style={{ color: "rgba(255,255,255,0.4)" }}>
@@ -315,34 +306,21 @@ const CallContent = ({ isAudioOnly, peerName, peerImage, onCallEnd, onMissed }) 
                 </p>
               </div>
             )}
-
-            {/* Local PiP */}
             {local && (
-              <div
-                className="absolute top-16 right-3 w-24 h-36 sm:w-28 sm:h-44 rounded-xl overflow-hidden shadow-2xl z-10"
-                style={{ border: "2px solid rgba(255,255,255,0.2)" }}
-              >
-                <ParticipantView
-                  participant={local}
-                  className="w-full h-full object-cover"
-                  trackType="videoTrack"
-                  mirror
-                />
+              <div className="absolute top-16 right-3 w-24 h-36 sm:w-28 sm:h-44 rounded-xl overflow-hidden shadow-2xl z-10"
+                style={{ border: "2px solid rgba(255,255,255,0.2)" }}>
+                <ParticipantView participant={local}
+                  className="w-full h-full object-cover" trackType="videoTrack" mirror />
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* ── Controls ── */}
-      <div
-        className="shrink-0"
-        style={{
-          paddingBottom: "env(safe-area-inset-bottom, 16px)",
-          background: "linear-gradient(to top, #0d1117 60%, transparent)",
-        }}
-      >
-        <Controls isAudioOnly={isAudioOnly} onEnd={endCall} />
+      {/* Controls */}
+      <div className="shrink-0"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 16px)", background: "linear-gradient(to top, #0d1117 60%, transparent)" }}>
+        <Controls isAudioOnly={isAudioOnly} onEnd={endCall} call={call} />
       </div>
     </div>
   );
@@ -378,7 +356,7 @@ const CallPage = () => {
 
     (async () => {
       try {
-        // Disconnect any stale video client before creating a new one
+        // Clean up any stale video client
         if (window.__streamVideoClient) {
           try { await window.__streamVideoClient.disconnectUser(); } catch { /* silent */ }
           window.__streamVideoClient = null;
@@ -395,7 +373,7 @@ const CallPage = () => {
         const ci = vc.call("default", callId);
         window.__streamCall = ci;
 
-        // Request permissions BEFORE joining — triggers browser prompt once
+        // Request permissions before joining
         try {
           const stream = await navigator.mediaDevices.getUserMedia(
             isAudioOnly ? { audio: true } : { audio: true, video: true }
@@ -423,11 +401,10 @@ const CallPage = () => {
           setPeerImage(other.user.image || "");
         }
 
-        // Am I the caller?
         const createdById = ci.state?.createdBy?.id;
         isCallerRef.current = !createdById || createdById === authUser._id;
 
-        // Chat channel for call log + sync events
+        // Chat channel
         const cc = StreamChat.getInstance(STREAM_API_KEY);
         if (!cc.userID) {
           await cc.connectUser(
@@ -442,19 +419,14 @@ const CallPage = () => {
           if (!cancelled) setChatCh(ch);
 
           ch.on((event) => {
-            // Receiver rejected → caller gets missed call + navigates back
             if (event.type === "call_rejected" && event.callId === callId) {
               ch.sendMessage({
-                text: "Missed call",
-                call_log: true,
+                text: "Missed call", call_log: true,
                 call_type: isAudioOnly ? "voice" : "video",
-                call_duration: 0,
-                call_missed: true,
-                call_direction: "outgoing",
+                call_duration: 0, call_missed: true, call_direction: "outgoing",
               }).catch(() => {});
               navigate(-1);
             }
-            // Other user ended → navigate back instantly
             if (event.type === "call_ended" && event.callId === callId) {
               navigate(-1);
             }
@@ -483,11 +455,9 @@ const CallPage = () => {
     try {
       if (chatCh) {
         await chatCh.sendMessage({
-          text: "Missed call",
-          call_log: true,
+          text: "Missed call", call_log: true,
           call_type: isAudioOnly ? "voice" : "video",
-          call_duration: 0,
-          call_missed: true,
+          call_duration: 0, call_missed: true,
           call_direction: isCallerRef.current ? "outgoing" : "incoming",
         });
         await chatCh.sendEvent({ type: "call_ended", callId });
@@ -517,26 +487,16 @@ const CallPage = () => {
   if (authLoading || busy) return <PageLoader />;
 
   if (!videoClient || !call) return (
-    <div
-      className="flex flex-col items-center justify-center gap-4 text-white"
-      style={{ height: "100dvh", background: "#0d1117" }}
-    >
+    <div className="flex flex-col items-center justify-center gap-4 text-white"
+      style={{ height: "100dvh", background: "#0d1117" }}>
       <PhoneOffIcon className="size-12" style={{ color: "#f87171" }} />
       <p className="text-lg font-medium">Could not connect</p>
-      <button
-        className="px-6 py-2.5 rounded-full text-white font-medium active:scale-95 mt-2"
-        style={{ background: "#00a884" }}
-        onClick={() => window.location.reload()}
-      >
+      <button className="px-6 py-2.5 rounded-full text-white font-medium active:scale-95 mt-2"
+        style={{ background: "#00a884" }} onClick={() => window.location.reload()}>
         Try Again
       </button>
-      <button
-        className="text-sm underline mt-1"
-        style={{ color: "rgba(255,255,255,0.4)" }}
-        onClick={() => navigate(-1)}
-      >
-        Go back
-      </button>
+      <button className="text-sm underline mt-1" style={{ color: "rgba(255,255,255,0.4)" }}
+        onClick={() => navigate(-1)}>Go back</button>
     </div>
   );
 
@@ -549,6 +509,7 @@ const CallPage = () => {
           peerImage={peerImage || authUser?.profilePic || ""}
           onCallEnd={handleCallEnd}
           onMissed={handleMissed}
+          call={call}
         />
       </StreamCall>
     </StreamVideo>

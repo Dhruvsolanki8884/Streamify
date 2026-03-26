@@ -45,7 +45,7 @@ const ForgotPasswordModal = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(24, 23, 23, 0.6)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-sm bg-base-100 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-base-300">
@@ -218,15 +218,15 @@ const LoginPage = () => {
                       onClick={() => setShowPassword(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50 hover:text-base-content transition-colors"
                     >
-                      {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                      {showPassword ?  <EyeIcon className="size-4" /> : <EyeOffIcon className="size-4" />}
                     </button>
                   </div>
                 </div>
 
                 <button type="submit" className="btn btn-primary w-full" disabled={isPending}>
                   {isPending ? (
-                    <><span className="loading loading-spinner loading-xs" /> Signing in...</>
-                  ) : "Sign In"}
+                    <><span className="loading loading-spinner loading-xs" /> Login...</>
+                  ) : "Login"}
                 </button>
 
                 <div className="text-center mt-2">

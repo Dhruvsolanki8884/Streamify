@@ -108,7 +108,7 @@ const SignUpPage = () => {
                         onClick={() => setShowPassword(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50 hover:text-base-content transition-colors"
                       >
-                        {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                        {showPassword ? <EyeIcon className="size-4" /> : <EyeOffIcon className="size-4" />}
                       </button>
                     </div>
                     <p className="text-xs opacity-70 mt-1">
